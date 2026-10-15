@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F7F4FC">
+<title>しゅみツイン</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F7F4FC; --card:#fff; --ink:#3D3656; --muted:#7F78A0; --line:#E6E0F3;
+  --mint:#BDE9DB; --peach:#FFD3C2; --main:#6A62D6; --main-soft:#ECEAFB; --err:#C2415D;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif;
+  line-height:1.7; font-size:16px;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+main{max-width:480px;margin:0 auto;padding:20px 18px 48px}
+.mark{display:inline-flex;align-items:center}
+.mark i{display:block;width:var(--s,22px);height:var(--s,22px);border-radius:50%;background:var(--mint)}
+.mark i+i{background:var(--peach);margin-left:calc(var(--s,22px)*-.36);mix-blend-mode:multiply}
+header.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+header.top b{font-size:18px;margin-left:10px}
+.brand{display:flex;align-items:center}
+.hero{text-align:center;padding:40px 0 24px}
+.hero .mark{--s:64px}
+.hero h1{font-size:30px;margin:18px 0 4px;letter-spacing:.04em}
+.hero p{margin:0;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;margin-bottom:16px}
+.card h2{font-size:17px;margin:0 0 12px}
+input{width:100%;font:inherit;color:inherit;padding:12px 14px;margin-bottom:10px;border:1.5px solid var(--line);border-radius:14px;background:#fff}
+input:focus,button:focus-visible{outline:3px solid #CFCBF6;outline-offset:1px;border-color:var(--main)}
+button{font:inherit;cursor:pointer;border-radius:14px;border:1.5px solid var(--line);background:#fff;color:var(--ink);padding:11px 16px}
+button.primary{background:var(--main);border-color:var(--main);color:#fff;width:100%;font-weight:700}
+button.link{border:0;background:none;color:var(--main);padding:6px 0;text-decoration:underline}
+button.danger{color:var(--err);border-color:#F0C9D2}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px}.row input{margin:0}
+.pair-btn{display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;margin-bottom:8px;background:var(--main-soft);border-color:transparent}
+.empty{color:var(--muted);margin:0 0 4px}
+.member{display:flex;align-items:center;gap:10px;margin:6px 0}
+.dot{width:14px;height:14px;border-radius:50%;background:var(--mint)}
+.dot.other{background:var(--peach)}
+.note{color:var(--muted);font-size:14px;margin:8px 0 0}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  max-width:min(440px,92vw);background:var(--ink);color:#fff;padding:12px 18px;border-radius:16px;font-size:15px;z-index:9}
+#toast.err{background:var(--err)}
+dialog{border:0;border-radius:22px;padding:22px;max-width:min(400px,90vw);color:var(--ink);font-family:inherit}
+dialog::backdrop{background:rgba(61,54,86,.35)}
+dialog p{margin:0 0 18px}
+dialog .row button{flex:1}
+</style>
+</head>
+<body>
+<main id="app"></main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+// ▼ Supabase の「Project Settings → API」でコピーした値を入れてください
+const SUPABASE_URL = 'https://ymskbxvkjinziivnrasw.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inltc2tieHZramluemlpdm5yYXN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwMTE4MjgsImV4cCI6MjEwNzU4NzgyOH0.FxegbZgAPZDWi6jI84SM2mRtw1524ra8dNc1xM6_PCo';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const app = document.getElementById('app');
+const state = { user: null };
+
+// ---------- 小さな部品 ----------
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v);
+  }
+  e.append(...kids.flat().filter(x => x != null && x !== false));
+  return e;
+}
+const mark = (size) => el('span', { class: 'mark', style: size ? `--s:${size}px` : null }, el('i'), el('i'));
+const mount = (...nodes) => app.replaceChildren(...nodes);
+
+let toastTimer;
+function toast(text, isErr = false, ms = 3500) {
+  document.getElementById('toast')?.remove();
+  const t = el('div', { id: 'toast', class: isErr ? 'err' : '', role: 'status' }, text);
+  document.body.append(t);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.remove(), ms);
+}
+
+function confirmDialog(text, okLabel, cancelLabel) {
+  return new Promise(resolve => {
+    const d = el('dialog', {},
+      el('p', {}, text),
+      el('div', { class: 'row' },
+        el('button', { type: 'button', onclick: () => { d.close(); resolve(false); } }, cancelLabel),
+        el('button', { type: 'button', class: 'danger', onclick: () => { d.close(); resolve(true); } }, okLabel)));
+    d.addEventListener('close', () => { d.remove(); resolve(false); });
+    document.body.append(d);
+    d.showModal();
+  });
+}
+
+// ---------- ログイン / 新規登録 ----------
+function renderAuth(signup = false) {
+  const name = el('input', { placeholder: '表示名(相手に見えます)', autocomplete: 'nickname' });
+  const email = el('input', { type: 'email', placeholder: 'メールアドレス', autocomplete: 'email' });
+  const pass = el('input', { type: 'password', placeholder: 'パスワード(6文字以上)',
+    autocomplete: signup ? 'new-password' : 'current-password' });
+  const btn = el('button', { class: 'primary', type: 'button', onclick: async () => {
+    btn.disabled = true;
+    const creds = { email: email.value.trim(), password: pass.value };
+    const { data, error } = signup
+      ? await sb.auth.signUp({ ...creds, options: { data: { display_name: name.value.trim() } } })
+      : await sb.auth.signInWithPassword(creds);
+    btn.disabled = false;
+    if (error) return toast(error.message, true);
+    if (signup && !data.session) toast('確認メールを送りました。メール内のリンクを開いてからログインしてください', false, 7000);
+  } }, signup ? 'アカウントを作る' : 'ログイン');
+
+  mount(
+    el('div', { class: 'hero' }, mark(), el('h1', {}, 'しゅみツイン'),
+      el('p', {}, 'ふたりの趣味を、ひとつのカレンダーに。')),
+    el('div', { class: 'card' },
+      signup ? name : null, email, pass, btn,
+      el('p', { class: 'note' },
+        el('button', { class: 'link', type: 'button', onclick: () => renderAuth(!signup) },
+          signup ? 'アカウントがある方はログイン' : 'はじめての方はアカウントを作る'))),
+    localStorage.getItem('pendingInvite')
+      ? el('p', { class: 'note' }, '招待リンクから来ました。ログインするとペアに参加します。') : null);
+}
+
+// ---------- 共通ヘッダー ----------
+function header(withBack) {
+  return el('header', { class: 'top' },
+    withBack
+      ? el('button', { class: 'link', type: 'button', onclick: renderHome }, '← ペア一覧')
+      : el('div', { class: 'brand' }, mark(), el('b', {}, 'しゅみツイン')),
+    el('button', { class: 'link', type: 'button', onclick: () => sb.auth.signOut() }, 'ログアウト'));
+}
+
+// ---------- ペア一覧・作成 ----------
+async function renderHome() {
+  const { data, error } = await sb.from('pair_members')
+    .select('pair_id, pairs(id, name)')
+    .eq('user_id', state.user.id).is('left_at', null);
+  if (error) return toast(error.message, true);
+
+  const pairName = el('input', { placeholder: 'ペアの名前(例: 週末ふたり)', maxlength: '30' });
+  const createBtn = el('button', { type: 'button', onclick: async () => {
+    if (!pairName.value.trim()) return toast('ペアの名前を入れてください', true);
+    createBtn.disabled = true;
+    const { data: id, error } = await sb.rpc('create_pair', { p_name: pairName.value.trim() });
+    createBtn.disabled = false;
+    if (error) return toast(error.message, true);
+    renderPair(id, pairName.value.trim());
+  } }, '作る');
+
+  const pairs = (data || []).map(m => m.pairs).filter(Boolean);
+  mount(header(false),
+    el('div', { class: 'card' }, el('h2', {}, 'あなたのペア'),
+      pairs.length
+        ? pairs.map(p => el('button', { class: 'pair-btn', type: 'button', onclick: () => renderPair(p.id, p.name) }, p.name, '›'))
+        : el('p', { class: 'empty' }, 'まだペアがありません。下で作って、相手に招待リンクを送りましょう。')),
+    el('div', { class: 'card' }, el('h2', {}, 'ペアを作る'),
+      el('div', { class: 'row' }, pairName, createBtn)));
+}
+
+// ---------- ペアの画面(メンバー・招待・脱退) ----------
+async function renderPair(pairId, pairName) {
+  const { data: members, error } = await sb.from('pair_members')
+    .select('user_id, left_at, profiles(display_name)').eq('pair_id', pairId);
+  if (error) return toast(error.message, true);
+
+  const me = state.user.id;
+  const active = members.filter(m => !m.left_at);
+  const others = active.filter(m => m.user_id !== me);
+  const partnerLeft = members.some(m => m.left_at && m.user_id !== me);
+
+  const linkBox = el('div');
+  const inviteBtn = el('button', { type: 'button', onclick: async () => {
+    inviteBtn.disabled = true;
+    const { data, error } = await sb.from('invites').insert({ pair_id: pairId }).select('token').single();
+    inviteBtn.disabled = false;
+    if (error) return toast(error.message, true);
+    const url = `${location.origin}${location.pathname}?invite=${data.token}`;
+    const field = el('input', { value: url, readonly: true, 'aria-label': '招待リンク' });
+    const copy = el('button', { type: 'button', onclick: async () => {
+      if (navigator.share) { try { await navigator.share({ title: 'しゅみツイン', url }); return; } catch {} }
+      try { await navigator.clipboard.writeText(url); toast('コピーしました'); } catch { field.select(); }
+    } }, navigator.share ? '共有' : 'コピー');
+    linkBox.replaceChildren(el('div', { class: 'row' }, field, copy),
+      el('p', { class: 'note' }, '7日間有効。1回使うと無効になります。'));
+  } }, '招待リンクを作る');
+
+  const leaveBtn = el('button', { type: 'button', class: 'danger', onclick: async () => {
+    const last = others.length === 0;
+    const text = !last ? 'このペアを脱退しますか?相手は記録を見続けられます。'
+      : partnerLeft ? 'ペアが脱退しているため、このまま脱退するとデータが失われます。'
+      : 'このまま脱退するとデータが失われます。';
+    if (!await confirmDialog(text, '脱退する', 'まだ残る')) return;
+    const { data: empty, error } = await sb.rpc('leave_pair', { p_pair_id: pairId });
+    if (error) return toast(error.message, true);
+    // 全員が脱退したら、ファイルとペアのデータを削除する(Edge Function は次のステップで作成)
+    if (empty) { try { await sb.functions.invoke('delete-pair', { body: { pair_id: pairId } }); } catch {} }
+    toast('脱退しました');
+    renderHome();
+  } }, 'このペアを脱退する');
+
+  mount(header(true),
+    el('div', { class: 'card' }, el('h2', {}, pairName),
+      active.map(m => el('div', { class: 'member' },
+        el('span', { class: m.user_id === me ? 'dot' : 'dot other' }),
+        (m.profiles?.display_name || '名前なし') + (m.user_id === me ? '(あなた)' : ''))),
+      active.length < 2 ? el('p', { class: 'note' }, '相手はまだ参加していません。') : null),
+    active.length < 2
+      ? el('div', { class: 'card' }, el('h2', {}, '相手を招待する'), inviteBtn, linkBox)
+      : null,
+    el('div', { class: 'card' }, leaveBtn));
+}
+
+// ---------- 招待リンクの受け取り ----------
+const inviteParam = new URLSearchParams(location.search).get('invite');
+if (inviteParam) {
+  localStorage.setItem('pendingInvite', inviteParam);
+  history.replaceState(null, '', location.pathname);
+}
+
+async function acceptPendingInvite() {
+  const token = localStorage.getItem('pendingInvite');
+  if (!token) return;
+  localStorage.removeItem('pendingInvite');
+  const { data: pairId, error } = await sb.rpc('accept_invite', { p_token: token });
+  if (error) return toast(error.message, true, 6000);
+  toast('ペアに参加しました');
+  return pairId;
+}
+
+// ---------- 起動 ----------
+async function route() {
+  if (!state.user) return renderAuth();
+  await acceptPendingInvite();
+  renderHome();
+}
+
+let lastId = null;
+sb.auth.onAuthStateChange((_event, session) => {
+  const id = session?.user?.id ?? null;
+  if (id === lastId) return;           // トークン更新などでは画面を作り直さない
+  lastId = id;
+  state.user = session?.user ?? null;
+  setTimeout(route, 0);                // コールバック内で直接 Supabase を呼ばない
+});
+</script>
+</body>
+</html>
